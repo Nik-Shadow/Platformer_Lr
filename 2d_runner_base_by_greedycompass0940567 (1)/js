@@ -1,0 +1,353 @@
+    const fx = {
+      runDust: [],
+      jumpDust: [],
+      dashWaves: [],
+      teleportBursts: [],
+      teleportParticles: [],
+      teleportAfterimages: [],
+      floatingNumbers: []
+    };
+
+    // simple FX object pools to reduce allocations
+    const fxPools = {
+      runDust: [],
+      jumpDust: [],
+      dashWaves: [],
+      teleportBursts: [],
+      teleportParticles: [],
+      teleportAfterimages: [],
+      floatingNumbers: []
+    };
+// ... existing code ...
+    const fireWall = {
+      x: (firstPlat?.x ?? 0) - 20 * UNIT,
+      y: -3000,
+      width: 80,
+      height: 6000,
+      speed: 0
+    };
+// ... existing code ...
+    return {
+      platforms,
+      hazards,
+      bonuses,
+      boosters,
+      speedState,
+      fx,
+      fxPools,
+      fireWall,
+      levelManager,
+      layerState
+    };
+// ... existing code ...
+  function switchDimension() {
+    // disable hook when shifting
+    player.hookActive = false;
+
+    // trigger a short teleport visual effect at the player's current position
+    const activeLayerBefore = getActiveLayer();
+    const originX = player.x;
+    const originY = player.y;
+
+    // core burst in old world
+    const burstBefore =
+      activeLayerBefore.fxPools.teleportBursts.pop() || {
+        x: 0,
+        y: 0,
+        t: 0,
+        duration: 0.3
+      };
+    burstBefore.x = originX;
+    burstBefore.y = originY;
+    burstBefore.t = 0;
+    burstBefore.duration = 0.3;
+    activeLayerBefore.fx.teleportBursts.push(burstBefore);
+
+    // particles in old world
+    for (let i = 0; i < 24; i++) {
+      const p =
+        activeLayerBefore.fxPools.teleportParticles.pop() || {
+          x: 0,
+          y: 0,
+          vx: 0,
+          vy: 0,
+          t: 0,
+          duration: 0.35
+        };
+      p.x = originX;
+      p.y = originY;
+      const angle = (Math.PI * 2 * i) / 24;
+      const speed = 220 + Math.random() * 120;
+      p.vx = Math.cos(angle) * speed;
+      p.vy = Math.sin(angle) * speed * 0.6;
+      p.t = 0;
+      p.duration = 0.35;
+      activeLayerBefore.fx.teleportParticles.push(p);
+    }
+
+    // afterimage in old world
+    const afterBefore =
+      activeLayerBefore.fxPools.teleportAfterimages.pop() || {
+        x: 0,
+        y: 0,
+        t: 0,
+        duration: 0.12
+      };
+    afterBefore.x = originX;
+    afterBefore.y = originY;
+    afterBefore.t = 0;
+    afterBefore.duration = 0.12;
+    activeLayerBefore.fx.teleportAfterimages.push(afterBefore);
+
+    player.teleportFadeTimer = player.teleportFadeDuration;
+
+    // switch active dimension (world state is preserved)
+    currentDimension = currentDimension === "A" ? "B" : "A";
+
+    const activeLayerAfter = getActiveLayer();
+
+    // core burst in new world
+    const burstAfter =
+      activeLayerAfter.fxPools.teleportBursts.pop() || {
+        x: 0,
+        y: 0,
+        t: 0,
+        duration: 0.3
+      };
+    burstAfter.x = originX;
+    burstAfter.y = originY;
+    burstAfter.t = 0;
+    burstAfter.duration = 0.3;
+    activeLayerAfter.fx.teleportBursts.push(burstAfter);
+
+    // particles in new world
+    for (let i = 0; i < 24; i++) {
+      const p =
+        activeLayerAfter.fxPools.teleportParticles.pop() || {
+          x: 0,
+          y: 0,
+          vx: 0,
+          vy: 0,
+          t: 0,
+          duration: 0.35
+        };
+      p.x = originX;
+      p.y = originY;
+      const angle = (Math.PI * 2 * i) / 24 + Math.random() * 0.3;
+      const speed = 220 + Math.random() * 120;
+      p.vx = Math.cos(angle) * speed;
+      p.vy = Math.sin(angle) * speed * 0.6;
+      p.t = 0;
+      p.duration = 0.35;
+      activeLayerAfter.fx.teleportParticles.push(p);
+    }
+
+    // afterimage in new world
+    const afterAfter =
+      activeLayerAfter.fxPools.teleportAfterimages.pop() || {
+        x: 0,
+        y: 0,
+        t: 0,
+        duration: 0.12
+      };
+    afterAfter.x = originX;
+    afterAfter.y = originY;
+    afterAfter.t = 0;
+    afterAfter.duration = 0.12;
+    activeLayerAfter.fx.teleportAfterimages.push(afterAfter);
+
+    // find a safe surface in the new world at the same X (if any)
+    findSafePlayerPosition();
+  }
+// ... existing code ...
+  function updateFX(dt) {
+    const { fx, fxPools } = getActiveLayer();
+
+    // running dust while grounded & moving
+// ... existing code unchanged until advanceList calls ...
+    advanceList(fx.runDust, fxPools.runDust);
+    advanceList(fx.jumpDust, fxPools.jumpDust);
+    advanceList(fx.dashWaves, fxPools.dashWaves);
+    advanceList(fx.teleportBursts, fxPools.teleportBursts);
+    advanceList(fx.teleportParticles, fxPools.teleportParticles);
+    advanceList(fx.teleportAfterimages, fxPools.teleportAfterimages);
+
+    // floating score numbers: when they finish, apply score and recycle
+    for (let i = fx.floatingNumbers.length - 1; i >= 0; i--) {
+      const e = fx.floatingNumbers[i];
+      e.t += dt;
+      if (e.t >= e.duration) {
+        const value = typeof e.value === "number" ? e.value : 0;
+        getActiveLayer().speedState.score += value;
+        fx.floatingNumbers.splice(i, 1);
+        fxPools.floatingNumbers.push(e);
+      }
+    }
+  }
+// ... existing code ...
+
+export function drawFX(ctx, state, spritesReady) {
+  drawHook(ctx, state);
+  drawDashWaves(ctx, state);
+  drawDustFX(ctx, state, spritesReady);
+  drawTeleportFX(ctx, state);
+  drawFloatingNumbers(ctx, state);
+}
+
+function drawTeleportFX(ctx, state) {
+  const { fx } = state.world;
+  if (!fx) return;
+
+  const bursts = fx.teleportBursts || [];
+  const particles = fx.teleportParticles || [];
+  const afterimages = fx.teleportAfterimages || [];
+
+  // bright expanding rings + chromatic halo
+  ctx.save();
+
+  for (const burst of bursts) {
+    const progress = burst.t / burst.duration;
+    const alpha = 1 - progress;
+
+    const baseRadius = 14;
+    const radius = baseRadius + 80 * progress;
+
+    // main white core ring
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.7 * alpha})`;
+    ctx.lineWidth = 3 * (1 - 0.3 * progress);
+    ctx.beginPath();
+    ctx.arc(burst.x, burst.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // inner glow
+    const innerRadius = radius * 0.45;
+    const grad = ctx.createRadialGradient(
+      burst.x,
+      burst.y,
+      0,
+      burst.x,
+      burst.y,
+      innerRadius
+    );
+    grad.addColorStop(0, `rgba(255, 255, 255, ${0.9 * alpha})`);
+    grad.addColorStop(0.5, `rgba(200, 170, 255, ${0.5 * alpha})`);
+    grad.addColorStop(1, "rgba(160, 120, 255, 0)");
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(burst.x, burst.y, innerRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // subtle chromatic shift rings
+    const chromaRadius = radius * 1.1;
+    ctx.lineWidth = 2;
+
+    ctx.strokeStyle = `rgba(255, 80, 120, ${0.4 * alpha})`;
+    ctx.beginPath();
+    ctx.arc(burst.x - 2, burst.y, chromaRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(80, 200, 255, ${0.4 * alpha})`;
+    ctx.beginPath();
+    ctx.arc(burst.x + 2, burst.y, chromaRadius * 0.95, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // particle burst
+  for (const p of particles) {
+    const progress = p.t / p.duration;
+    const alpha = 1 - progress;
+    const size = 3 + 5 * (1 - progress);
+
+    const px = p.x + p.vx * (p.t / p.duration) * 0.12;
+    const py = p.y + p.vy * (p.t / p.duration) * 0.12;
+
+    const grad = ctx.createRadialGradient(
+      px,
+      py,
+      0,
+      px,
+      py,
+      size
+    );
+    grad.addColorStop(0, `rgba(255, 255, 255, ${0.9 * alpha})`);
+    grad.addColorStop(0.4, `rgba(200, 210, 255, ${0.6 * alpha})`);
+    grad.addColorStop(1, "rgba(160, 180, 255, 0)");
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(px, py, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // afterimage silhouette
+  for (const a of afterimages) {
+    const progress = a.t / a.duration;
+    const alpha = 1 - progress;
+
+    const baseRadius = 18;
+    const rX = baseRadius * 0.9;
+    const rY = baseRadius * 1.2;
+
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    ctx.scale(1, 1);
+
+    const grad = ctx.createRadialGradient(
+      0,
+      0,
+      0,
+      0,
+      0,
+      rY
+    );
+    grad.addColorStop(0, `rgba(255, 255, 255, ${0.35 * alpha})`);
+    grad.addColorStop(0.6, `rgba(200, 200, 255, ${0.2 * alpha})`);
+    grad.addColorStop(1, "rgba(160, 160, 230, 0)");
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    for (let i = 0; i < 2; i++) {
+      ctx.ellipse(0, -rY * 0.1, rX, rY, 0, 0, Math.PI * 2);
+      ctx.globalAlpha = 0.9;
+    }
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+  // Variable jump height helpers
+  const MAX_JUMP_BOOST_TIME = 0.24;
+  const INITIAL_JUMP_VELOCITY = JUMP_VELOCITY * 0.35; // smaller initial hop for quick taps
+  const TARGET_JUMP_VELOCITY = JUMP_VELOCITY; // full jump matches original height
+  let jumpBoostTimer = 0;
+// ... existing code ...
+    if (justPressed && player.onGround && player.energy > 0.1) {
+      // start a variable jump: small initial hop, then optional boost while held
+      player.vy = INITIAL_JUMP_VELOCITY;
+      player.onGround = false;
+      jumpBoostTimer = MAX_JUMP_BOOST_TIME;
+    } else if (!jumpInput) {
+      // releasing cancels any remaining boost
+      jumpBoostTimer = 0;
+    }
+
+    // apply additional upward velocity while the jump button is held
+    if (jumpInput && jumpBoostTimer > 0 && player.vy < 0) {
+      const usedTime = MAX_JUMP_BOOST_TIME - jumpBoostTimer;
+      const t = Math.max(0, Math.min(1, usedTime / MAX_JUMP_BOOST_TIME));
+      const desiredVy =
+        INITIAL_JUMP_VELOCITY +
+        (TARGET_JUMP_VELOCITY - INITIAL_JUMP_VELOCITY) * t;
+
+      if (player.vy > desiredVy) {
+        // smoothly approach the desired curve instead of snapping instantly
+        const blend = 0.5;
+        player.vy += (desiredVy - player.vy) * blend;
+      }
+
+      jumpBoostTimer = Math.max(0, jumpBoostTimer - dt);
+    }
+
